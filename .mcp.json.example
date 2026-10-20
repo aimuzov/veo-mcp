@@ -1,0 +1,12 @@
+{
+	"mcpServers": {
+		"veo": {
+			"command": "node",
+			"args": ["/path/to/veo-mcp/src/index.ts"],
+			"env": {
+				"GEMINI_API_KEY": "your-api-key",
+				"VEO_OUTPUT_DIR": "./veo"
+			}
+		}
+	}
+}
