@@ -33,7 +33,8 @@ export type Operation = {
 	}
 }
 
-type InlineImage = { inlineData: { mimeType: string; data: string } }
+// predictLongRunning ждёт картинку в формате Vertex: `inlineData` из generateContent он отвергает.
+type EncodedImage = { bytesBase64Encoded: string; mimeType: string }
 
 const MIME_TYPES: Record<string, string> = {
 	'.png': 'image/png',
@@ -52,11 +53,11 @@ export function mimeTypeOf(path: string): string {
 	return mime
 }
 
-async function loadImage(path: string): Promise<InlineImage> {
+async function loadImage(path: string): Promise<EncodedImage> {
 	const mimeType = mimeTypeOf(path)
-	const data = (await readFile(resolve(path))).toString('base64')
+	const bytesBase64Encoded = (await readFile(resolve(path))).toString('base64')
 
-	return { inlineData: { mimeType, data } }
+	return { bytesBase64Encoded, mimeType }
 }
 
 /** Тело запроса `predictLongRunning`. Картинки читаются с диска и уходят base64. */
