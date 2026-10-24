@@ -1,29 +1,61 @@
 {
-	"name": "veo-mcp",
+	"name": "@aimuzov/veo-mcp",
 	"version": "0.1.0",
-	"private": true,
-	"description": "Minimal MCP server for Google Veo video generation through the Gemini API: text-to-video and image-to-video, saves MP4 files to disk",
+	"description": "MCP server for Google Veo video generation through the Gemini API: text-to-video and image-to-video, saves MP4 files to disk",
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"mcp-server",
+		"claude",
+		"claude-code",
+		"veo",
+		"gemini",
+		"video-generation",
+		"text-to-video",
+		"image-to-video"
+	],
+	"homepage": "https://github.com/aimuzov/veo-mcp#readme",
+	"bugs": {
+		"url": "https://github.com/aimuzov/veo-mcp/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/aimuzov/veo-mcp.git"
+	},
 	"license": "MIT",
 	"author": "Aleksey Imuzov",
-	"repository": "github:aimuzov/veo-mcp",
 	"type": "module",
+	"bin": {
+		"veo-mcp": "build/index.js"
+	},
+	"files": [
+		"build",
+		".mcp.json.example"
+	],
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	},
 	"engines": {
 		"node": ">=26"
 	},
 	"scripts": {
 		"start": "node src/index.ts",
+		"build": "rm -rf build && tsc -p tsconfig.build.json",
 		"test": "node --test 'src/**/*.test.ts'",
 		"typecheck": "tsc",
 		"format": "oxlint --fix && prettier --write .",
 		"format:check": "prettier --check .",
-		"lint": "oxlint --deny-warnings"
+		"lint": "oxlint --deny-warnings",
+		"prepack": "npm run build"
 	},
 	"dependencies": {
+		"@aimuzov/infra-mcp-kit": "github:aimuzov/infra-mcp-kit#v1.0.1",
 		"@modelcontextprotocol/sdk": "1.32.1",
 		"zod": "4.6.7"
 	},
 	"devDependencies": {
-		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v3.1.0",
+		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v4.0.0",
 		"@types/node": "26.6.5",
 		"oxlint": "1.87.0",
 		"prettier": "3.9.9",

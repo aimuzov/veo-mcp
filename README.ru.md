@@ -28,22 +28,15 @@ Veo тарифицируется за секунду видео, рендер и
 
 ## Установка
 
-Нужна Node 26 или новее: сервер запускает исходники на TypeScript как есть, без сборки.
-
-```bash
-git clone https://github.com/aimuzov/veo-mcp.git
-cd veo-mcp
-npm ci --omit=dev
-```
-
-Потом добавить в конфиг MCP, пример в [.mcp.json.example](.mcp.json.example):
+Нужна Node 26 или новее. Сервер ставится npm-пакетом `@aimuzov/veo-mcp`, достаточно добавить его в конфиг MCP,
+пример в [.mcp.json.example](.mcp.json.example):
 
 ```json
 {
 	"mcpServers": {
 		"veo": {
-			"command": "node",
-			"args": ["/path/to/veo-mcp/src/index.ts"],
+			"command": "npx",
+			"args": ["-y", "@aimuzov/veo-mcp"],
 			"env": { "GEMINI_API_KEY": "your-api-key" }
 		}
 	}
@@ -63,12 +56,15 @@ npm ci --omit=dev
 
 ```bash
 npm install
+npm start          # исходники на TypeScript по stdio, без сборки
 npm test
 npm run lint
 npm run typecheck
+npm run build      # build/ для npm-пакета
 ```
 
-Правила форматирования и линтера берутся из [infra-site-kit](https://github.com/aimuzov/infra-site-kit).
+Общие хелперы и шаги CI берутся из [infra-mcp-kit](https://github.com/aimuzov/infra-mcp-kit), правила
+форматирования и линтера -- из [infra-site-kit](https://github.com/aimuzov/infra-site-kit).
 
 ## Лицензия
 

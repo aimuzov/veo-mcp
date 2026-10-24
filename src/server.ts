@@ -1,6 +1,5 @@
-import { createRequire } from 'node:module'
+import { failure, int, readVersion, str, tool, type Env } from '@aimuzov/infra-mcp-kit'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
 import {
@@ -14,8 +13,7 @@ import {
 	type VeoClient,
 } from './veo.ts'
 
-// Версию читаем в рантайме, чтобы рукопожатие MCP не отставало от package.json.
-const { version } = createRequire(import.meta.url)('../package.json') as { version: string }
+export const version = readVersion(import.meta.url)
 
 export type Config = {
 	apiKey: string
@@ -24,19 +22,16 @@ export type Config = {
 	timeoutMs: number
 }
 
-export function loadConfig(env = process.env): Config {
+export function loadConfig(env: Env = process.env): Config {
 	return {
-		apiKey: env.GEMINI_API_KEY ?? '',
-		outputDir: env.VEO_OUTPUT_DIR || './veo',
-		pollIntervalMs: Number(env.VEO_POLL_INTERVAL_MS) || 10_000,
-		timeoutMs: Number(env.VEO_TIMEOUT_MS) || 15 * 60_000,
+		apiKey: str(env, 'GEMINI_API_KEY'),
+		outputDir: str(env, 'VEO_OUTPUT_DIR', './veo'),
+		pollIntervalMs: int(env, 'VEO_POLL_INTERVAL_MS', 10_000),
+		timeoutMs: int(env, 'VEO_TIMEOUT_MS', 15 * 60_000),
 	}
 }
 
 const NO_KEY = 'GEMINI_API_KEY is not set. Get one at https://aistudio.google.com/apikey'
-
-const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] })
-const failure = (e: unknown) => ({ ...text(e instanceof Error ? e.message : String(e)), isError: true })
 
 /**
  * Без ключа сервер всё равно стартует: он живёт в глобальном конфиге MCP,
@@ -67,41 +62,36 @@ export function createServer(cfg: Config, client: VeoClient = createVeoClient(cf
 				outputDir: z.string().optional().describe(`Save directory, default ${cfg.outputDir}`),
 			},
 		},
-		async (args, extra) => {
+		tool(async (args, extra) => {
 			if (!cfg.apiKey) return failure(NO_KEY)
 
 			const { model = DEFAULT_MODEL, filename, outputDir = cfg.outputDir, ...req } = args
 			const progressToken = extra._meta?.progressToken
+			const name = await client.start(model, req)
+			const op = await client.wait(name, {
+				intervalMs: cfg.pollIntervalMs,
+				timeoutMs: cfg.timeoutMs,
+				// Рендер идёт минутами: прогресс не даёт клиенту оборвать вызов по таймауту.
+				onTick: (elapsed) => {
+					if (progressToken === undefined) return
 
-			try {
-				const name = await client.start(model, req)
-				const op = await client.wait(name, {
-					intervalMs: cfg.pollIntervalMs,
-					timeoutMs: cfg.timeoutMs,
-					// Рендер идёт минутами: прогресс не даёт клиенту оборвать вызов по таймауту.
-					onTick: (elapsed) => {
-						if (progressToken === undefined) return
+					void extra.sendNotification({
+						method: 'notifications/progress',
+						params: {
+							progressToken,
+							progress: elapsed,
+							total: cfg.timeoutMs,
+							message: `Veo is rendering, ${Math.round(elapsed / 1000)}s`,
+						},
+					})
+				},
+			})
+			const path = await outputPath(outputDir, filename)
 
-						void extra.sendNotification({
-							method: 'notifications/progress',
-							params: {
-								progressToken,
-								progress: elapsed,
-								total: cfg.timeoutMs,
-								message: `Veo is rendering, ${Math.round(elapsed / 1000)}s`,
-							},
-						})
-					},
-				})
-				const path = await outputPath(outputDir, filename)
+			await client.download(videoUriOf(op), path)
 
-				await client.download(videoUriOf(op), path)
-
-				return text(path)
-			} catch (e) {
-				return failure(e)
-			}
-		},
+			return path
+		}),
 	)
 
 	server.registerTool(
@@ -111,23 +101,14 @@ export function createServer(cfg: Config, client: VeoClient = createVeoClient(cf
 			description: 'List Veo model ids available to this API key.',
 			inputSchema: {},
 		},
-		async () => {
+		tool(async () => {
 			if (!cfg.apiKey) return failure(NO_KEY)
 
-			try {
-				const models = await client.listModels()
+			const models = await client.listModels()
 
-				return text(models.length ? models.join('\n') : 'No Veo models for this key')
-			} catch (e) {
-				return failure(e)
-			}
-		},
+			return models.length ? models.join('\n') : 'No Veo models for this key'
+		}),
 	)
 
 	return server
-}
-
-export async function serve(cfg: Config): Promise<void> {
-	await createServer(cfg).connect(new StdioServerTransport())
-	console.error('veo-mcp running on stdio')
 }

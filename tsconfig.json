@@ -9,6 +9,7 @@
 		"allowImportingTsExtensions": true,
 		"erasableSyntaxOnly": true,
 		"verbatimModuleSyntax": true,
+		"noUncheckedIndexedAccess": true,
 		"skipLibCheck": true
 	},
 	"include": ["src"]
