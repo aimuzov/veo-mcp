@@ -1,0 +1,56 @@
+name: Release
+
+# Мёрж в main только обновляет релизный PR. Мёрж этого PR выпускает релиз,
+# и релиз уходит в npm. Ручной запуск публикует заданный тег ещё раз.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish again, e.g. v1.2.0.
+        required: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    uses: aimuzov/.github/.github/workflows/release.yml@v1
+
+  check:
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    uses: ./.github/workflows/check.yml
+
+  # Пока нет доступа к npm, публикация пропускается. Включается переменной
+  # репозитория `NPM_PUBLISH=true`; без секрета `NPM_TOKEN` нужен trusted publishing.
+  publish:
+    needs: [release, check]
+    # `!cancelled()`, а не `always()`: job идёт и при пропущенных release и check
+    # (ручной запуск), но отменённый прогон не публикует.
+    if: >-
+      !cancelled() && vars.NPM_PUBLISH == 'true' &&
+      (github.event_name == 'workflow_dispatch' || needs.check.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@aimuzov/veo-mcp
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: aimuzov/infra-mcp-kit/publish@v1
+        with:
+          ref: ${{ needs.release.outputs.tag || inputs.tag }}
+          npm-token: ${{ secrets.NPM_TOKEN }}
