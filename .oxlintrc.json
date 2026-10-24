@@ -1,4 +1,4 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
-	"extends": ["./node_modules/@aimuzov-projects/infra-site-kit/oxlint.json"]
+	"extends": ["./node_modules/@aimuzov/infra-site-kit/oxlint.json"]
 }

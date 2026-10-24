@@ -23,7 +23,7 @@
 		"zod": "4.6.7"
 	},
 	"devDependencies": {
-		"@aimuzov-projects/infra-site-kit": "github:aimuzov-projects/infra-site-kit#v1.14.1",
+		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v3.1.0",
 		"@types/node": "26.6.5",
 		"oxlint": "1.87.0",
 		"prettier": "3.9.9",

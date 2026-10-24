@@ -68,7 +68,7 @@ npm run lint
 npm run typecheck
 ```
 
-Правила форматирования и линтера берутся из [infra-site-kit](https://github.com/aimuzov-projects/infra-site-kit).
+Правила форматирования и линтера берутся из [infra-site-kit](https://github.com/aimuzov/infra-site-kit).
 
 ## Лицензия
 

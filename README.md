@@ -68,7 +68,7 @@ npm run lint
 npm run typecheck
 ```
 
-Formatting and lint rules come from [infra-site-kit](https://github.com/aimuzov-projects/infra-site-kit).
+Formatting and lint rules come from [infra-site-kit](https://github.com/aimuzov/infra-site-kit).
 
 ## License
 
