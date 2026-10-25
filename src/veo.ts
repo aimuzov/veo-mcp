@@ -210,7 +210,7 @@ export function createVeoClient(apiKey: string, fetcher: typeof fetch = fetch) {
 			const elapsed = Date.now() - startedAt
 
 			if (elapsed >= timeoutMs) {
-				throw new Error(`Veo did not finish in ${Math.round(timeoutMs / 1000)}s. Operation: ${name}`)
+				throw new Error(`Veo did not finish in ${Math.round(timeoutMs / 1000)}s`)
 			}
 
 			onTick?.(elapsed)

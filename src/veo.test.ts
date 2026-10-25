@@ -104,12 +104,12 @@ test('клиент запускает рендер, ждёт готовност�
 	assert.ok(calls.every((c) => new Headers(c.init?.headers).get('x-goog-api-key') === 'key'))
 })
 
-test('по таймауту ошибка называет операцию, чтобы её можно было найти', async () => {
+test('по таймауту опрос прекращается', async () => {
 	const { fetcher } = fakeFetch({ [`${BASE_URL}/op/1`]: () => json({ name: 'op/1', done: false }) })
 
 	await assert.rejects(
 		createVeoClient('key', fetcher).wait('op/1', { intervalMs: 0, timeoutMs: 0 }),
-		/did not finish.*op\/1/,
+		/did not finish/,
 	)
 })
 
