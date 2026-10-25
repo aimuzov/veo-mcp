@@ -114,6 +114,8 @@ export function videoUriOf(op: Operation): string {
 export type WaitOptions = {
 	intervalMs: number
 	timeoutMs: number
+	/** Сколько ждать ответа на один опрос. Повисший запрос считается временным сбоем. */
+	requestTimeoutMs?: number
 	onTick?: (elapsedMs: number) => void
 	signal?: AbortSignal
 }
@@ -131,12 +133,16 @@ export class ApiError extends Error {
 	}
 }
 
-// fetch бросает TypeError, когда ответа нет вовсе: DNS, обрыв, сброс соединения.
+// fetch бросает TypeError, когда ответа нет вовсе: DNS, обрыв, сброс соединения,
+// а TimeoutError -- когда ответ не пришёл за requestTimeoutMs.
 export const isTransient = (error: unknown): boolean =>
-	error instanceof ApiError ? error.status === 429 || error.status >= 500 : error instanceof TypeError
+	error instanceof ApiError
+		? error.status === 429 || error.status >= 500
+		: error instanceof TypeError || (error instanceof DOMException && error.name === 'TimeoutError')
 
 const MAX_FAILURES = 5
 const MAX_BACKOFF_MS = 60_000
+const REQUEST_TIMEOUT_MS = 60_000
 
 const sleep = (ms: number, signal?: AbortSignal) =>
 	new Promise<void>((resolve, reject) => {
@@ -186,7 +192,10 @@ export function createVeoClient(apiKey: string, fetcher: typeof fetch = fetch) {
 		return op.name
 	}
 
-	async function wait(name: string, { intervalMs, timeoutMs, onTick, signal }: WaitOptions): Promise<Operation> {
+	async function wait(
+		name: string,
+		{ intervalMs, timeoutMs, requestTimeoutMs = REQUEST_TIMEOUT_MS, onTick, signal }: WaitOptions,
+	): Promise<Operation> {
 		const startedAt = Date.now()
 		let failures = 0
 
@@ -194,9 +203,14 @@ export function createVeoClient(apiKey: string, fetcher: typeof fetch = fetch) {
 			signal?.throwIfAborted()
 
 			let delay = intervalMs
+			// Без своего таймаута повисший опрос держал бы вызов дольше timeoutMs.
+			const left = Math.max(timeoutMs - (Date.now() - startedAt), 1)
+			const timeout = AbortSignal.timeout(Math.min(requestTimeoutMs, left))
 
 			try {
-				const op = await call<Operation>(`${BASE_URL}/${name}`, { signal })
+				const op = await call<Operation>(`${BASE_URL}/${name}`, {
+					signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+				})
 
 				if (op.done) return op
 
