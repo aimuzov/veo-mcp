@@ -50,7 +50,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: aimuzov/infra-mcp-kit/publish@v1
+      - uses: aimuzov/infra-mcp-kit/publish@v2
         with:
           ref: ${{ needs.release.outputs.tag || inputs.tag }}
           npm-token: ${{ secrets.NPM_TOKEN }}
