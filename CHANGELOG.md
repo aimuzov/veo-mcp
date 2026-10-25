@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/aimuzov/veo-mcp/compare/v0.2.0...v0.3.0) (2026-10-25)
+
+
+### Features
+
+* name the operation in errors and add fetch_video tool ([90f19fa](https://github.com/aimuzov/veo-mcp/commit/90f19fab748b3ef9e7c939d45360c98febff9875))
+
+
+### Bug Fixes
+
+* retry polling, keep the operation name and add fetch_video ([48bfa86](https://github.com/aimuzov/veo-mcp/commit/48bfa86a2b5c06c63f1a36752e9be111f7e0eb10))
+* **veo:** retry transient poll errors and honor abort signal ([6e4a6c9](https://github.com/aimuzov/veo-mcp/commit/6e4a6c9ab73e0eb1a00f47884918987b3699e336))
+
 ## [0.2.0](https://github.com/aimuzov/veo-mcp/compare/v0.1.0...v0.2.0) (2026-10-25)
 
 
