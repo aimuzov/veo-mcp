@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3](https://github.com/aimuzov/veo-mcp/compare/v0.3.2...v0.3.3) (2026-10-25)
+
+
+### Bug Fixes
+
+* move to infra-mcp-kit 3.0 so a cancelled call stops the render poll ([badb44f](https://github.com/aimuzov/veo-mcp/commit/badb44fe3b8a20dfb3c35f14f76d87d544b7d0fc))
+* move to infra-mcp-kit 3.0 so a cancelled call stops the render poll ([6c7af0f](https://github.com/aimuzov/veo-mcp/commit/6c7af0f7f3e821065dc775300d11d142141d977a))
+
 ## [0.3.2](https://github.com/aimuzov/veo-mcp/compare/v0.3.1...v0.3.2) (2026-10-25)
 
 
