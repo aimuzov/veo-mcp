@@ -15,6 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: aimuzov/infra-mcp-kit/check@v2
+      - uses: aimuzov/infra-mcp-kit/check@v3
         with:
           coverage-lines: 98

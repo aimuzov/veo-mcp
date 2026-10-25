@@ -1,7 +1,14 @@
-import { failure, int, messageOf, readVersion, str, tool, type Env } from '@aimuzov/infra-mcp-kit'
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js'
-import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js'
+import {
+	failure,
+	int,
+	McpServer,
+	messageOf,
+	readVersion,
+	str,
+	tool,
+	type Env,
+	type RequestExtra,
+} from '@aimuzov/infra-mcp-kit'
 import { z } from 'zod'
 
 import {
@@ -49,7 +56,7 @@ export function createServer(cfg: Config, client: VeoClient = createVeoClient(cf
 	async function finish(
 		name: string,
 		{ filename, outputDir = cfg.outputDir }: { filename?: string; outputDir?: string },
-		extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+		extra: RequestExtra,
 	): Promise<string> {
 		const progressToken = extra._meta?.progressToken
 
