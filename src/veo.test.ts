@@ -162,7 +162,39 @@ test('отмена останавливает ожидание между опр
 
 	await assert.rejects(waiting, /cancelled/)
 	assert.equal(calls.length, 1)
-	assert.equal(calls[0]?.init?.signal, controller.signal)
+	// Отмена вызова доходит и до самого запроса опроса.
+	assert.equal(calls[0]?.init?.signal?.aborted, true)
+})
+
+/** fetch, который не отвечает, пока запрос не оборвут. */
+const hanging = (signal?: AbortSignal | null) =>
+	new Promise<Response>((_, reject) => signal?.addEventListener('abort', () => reject(signal.reason), { once: true }))
+
+test('повисший опрос не держит ожидание дольше тайм-аута', async () => {
+	const fetcher = ((_url: string, init?: RequestInit) => hanging(init?.signal)) as typeof fetch
+	const startedAt = Date.now()
+
+	await assert.rejects(
+		createVeoClient('key', fetcher).wait('op/1', { intervalMs: 0, timeoutMs: 50 }),
+		/did not finish in 0s/,
+	)
+
+	assert.ok(Date.now() - startedAt < 1000)
+})
+
+test('повисший опрос повторяется, как временный сбой', async () => {
+	let calls = 0
+	const fetcher = (async (_url: string, init?: RequestInit) =>
+		++calls === 1 ? hanging(init?.signal) : json({ name: 'op/1', done: true })) as typeof fetch
+
+	const op = await createVeoClient('key', fetcher).wait('op/1', {
+		intervalMs: 0,
+		timeoutMs: 10_000,
+		requestTimeoutMs: 20,
+	})
+
+	assert.equal(op.done, true)
+	assert.equal(calls, 2)
 })
 
 test('ответ без имени операции отклоняется сразу, а не опросом /undefined', async () => {
