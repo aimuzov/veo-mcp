@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { PassThrough } from 'node:stream'
 import { test } from 'node:test'
+import { StdioServerTransport } from '@aimuzov/infra-mcp-kit'
 import { connectInMemory, expectTools, textOf } from '@aimuzov/infra-mcp-kit/testing'
 
 import { createServer, loadConfig, type Config } from './server.ts'
@@ -330,6 +332,36 @@ test('отмена вызова клиентом останавливает ож
 	await until(() => signal?.aborted === true)
 	// Сервер не ушёл на следующий опрос через минуту: пауза оборвана, процесс не висит.
 	assert.equal(api.calls.length, 1)
+})
+
+// Тот же путь, что у `npx veo-mcp`: голый JSON-RPC построчно через stdio-транспорт кита.
+// До кита 3.0 отмена по stdio доходила только до ответа, а опрос рендера шёл дальше.
+test('notifications/cancelled по stdio обрывает опрос рендера', async () => {
+	const api = veoApi({ polls: [{ name: OP, done: false }] })
+	const server = createServer(config({ pollIntervalMs: 60_000 }), api.client)
+	const input = new PassThrough()
+	const output = new PassThrough()
+	const send = (message: object) => input.write(`${JSON.stringify({ jsonrpc: '2.0', ...message })}\n`)
+
+	await server.connect(new StdioServerTransport(input, output))
+
+	send({
+		id: 1,
+		method: 'initialize',
+		params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } },
+	})
+
+	send({ method: 'notifications/initialized' })
+	send({ id: 2, method: 'tools/call', params: { name: 'fetch_video', arguments: { operation: OP } } })
+
+	await until(() => api.calls.length === 1)
+	send({ method: 'notifications/cancelled', params: { requestId: 2, reason: 'user' } })
+
+	const signal = api.calls[0]?.init?.signal
+
+	await until(() => signal?.aborted === true)
+	assert.equal(api.calls.length, 1)
+	await server.close()
 })
 
 test('без GEMINI_API_KEY сервер стартует, а каждый инструмент объясняет, где взять ключ', async () => {
