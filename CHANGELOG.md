@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/aimuzov/veo-mcp/compare/v0.3.0...v0.3.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* **deps:** move to infra-mcp-kit 2.0 ([2032683](https://github.com/aimuzov/veo-mcp/commit/20326837cc3c76c8da2ff261350e83e6bc483831))
+* **deps:** move to infra-mcp-kit 2.0 ([605c288](https://github.com/aimuzov/veo-mcp/commit/605c288860bcd7b56f73489eee1d2926a8a732f7))
+
 ## [0.3.0](https://github.com/aimuzov/veo-mcp/compare/v0.2.0...v0.3.0) (2026-10-25)
 
 
