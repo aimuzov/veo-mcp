@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.2](https://github.com/aimuzov/veo-mcp/compare/v0.3.1...v0.3.2) (2026-10-25)
+
+
+### Bug Fixes
+
+* time out a hanging poll instead of waiting past the render timeout ([cbdb131](https://github.com/aimuzov/veo-mcp/commit/cbdb131541bed0b322288f597bbb65d55c343bac))
+* time out a hanging poll instead of waiting past the render timeout ([16bf1c1](https://github.com/aimuzov/veo-mcp/commit/16bf1c146e7b5066c65917191298f3d9f1d2eeb3))
+
 ## [0.3.1](https://github.com/aimuzov/veo-mcp/compare/v0.3.0...v0.3.1) (2026-10-25)
 
 
