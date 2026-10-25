@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { test } from 'node:test'
+import { test, type TestContext } from 'node:test'
 
 import { BASE_URL, buildBody, createVeoClient, mimeTypeOf, outputPath, videoUriOf } from './veo.ts'
 
@@ -192,4 +192,220 @@ test('путь к видео создаёт папку и не удваивае�
 	const dir = join(await tmp(), 'nested')
 
 	assert.equal(await outputPath(dir, 'clip.mp4'), join(dir, 'clip.mp4'))
+})
+
+/**
+ * Довести промис до конца на поддельных таймерах: дать отработать микрозадачам,
+ * потом промотать часы до ближайшего таймера, и так пока промис не решится.
+ */
+async function drive<T>(t: TestContext, promise: Promise<T>): Promise<T> {
+	let settled = false
+
+	promise.then(
+		() => (settled = true),
+		() => (settled = true),
+	)
+
+	for (let i = 0; i < 1000 && !settled; i++) {
+		await new Promise((resolve) => setImmediate(resolve))
+
+		if (!settled) t.mock.timers.runAll()
+	}
+
+	return promise
+}
+
+/** Опрос по сценарию: каждый вызов берёт следующий ответ и запоминает время на поддельных часах. */
+function scripted(answers: (() => Response)[]) {
+	const at: number[] = []
+	const fetcher = (async (url: string) => {
+		assert.equal(url, `${BASE_URL}/op/1`)
+		at.push(Date.now())
+
+		const answer = answers[at.length - 1]
+
+		if (!answer) throw new Error(`лишний опрос №${at.length}`)
+
+		return answer()
+	}) as typeof fetch
+
+	return { fetcher, at }
+}
+
+const pending = () => json({ name: 'op/1', done: false })
+const status = (code: number) => () => new Response('err', { status: code })
+const offline = () => {
+	throw new TypeError('fetch failed')
+}
+
+test('при временных сбоях пауза между опросами растёт вдвое', async (t) => {
+	t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+
+	const { fetcher, at } = scripted([
+		offline,
+		status(503),
+		status(429),
+		status(500),
+		() => json({ name: 'op/1', done: true }),
+	])
+	const op = await drive(t, createVeoClient('key', fetcher).wait('op/1', { intervalMs: 1000, timeoutMs: 600_000 }))
+
+	assert.equal(op.done, true)
+	// Паузы 2, 4, 8 и 16 секунд: interval * 2^failures.
+	assert.deepEqual(at, [0, 2000, 6000, 14_000, 30_000])
+})
+
+test('пауза backoff не длиннее минуты', async (t) => {
+	t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+
+	const { fetcher, at } = scripted([status(500), status(500), () => json({ name: 'op/1', done: true })])
+
+	await drive(t, createVeoClient('key', fetcher).wait('op/1', { intervalMs: 40_000, timeoutMs: 600_000 }))
+
+	assert.deepEqual(at, [0, 60_000, 120_000])
+})
+
+test('без сбоев опрос идёт с обычным интервалом, а успешный ответ сбрасывает счётчик сбоев', async (t) => {
+	t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+
+	// Четыре сбоя, ответ, ещё четыре: без сброса пятый сбой подряд уронил бы опрос.
+	const fails = Array.from({ length: 4 }, () => status(502))
+	const { fetcher, at } = scripted([...fails, pending, ...fails, pending, () => json({ name: 'op/1', done: true })])
+	const op = await drive(t, createVeoClient('key', fetcher).wait('op/1', { intervalMs: 10, timeoutMs: 600_000 }))
+
+	assert.equal(op.done, true)
+	assert.equal(at.length, 11)
+	// Четвёртый сбой подряд даёт паузу interval * 16, а после ответа она снова равна интервалу.
+	assert.equal(at[4]! - at[3]!, 160)
+	assert.equal(at[5]! - at[4]!, 10)
+	assert.equal(at[10]! - at[9]!, 10)
+})
+
+test('тайм-аут считается по часам от начала ожидания, onTick получает прошедшее время', async (t) => {
+	t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+
+	const ticks: number[] = []
+	const { fetcher, at } = scripted([pending, pending, pending, pending])
+	const waiting = createVeoClient('key', fetcher).wait('op/1', {
+		intervalMs: 10_000,
+		timeoutMs: 30_000,
+		onTick: (elapsed) => ticks.push(elapsed),
+	})
+
+	await assert.rejects(drive(t, waiting), { message: 'Veo did not finish in 30s' })
+	assert.deepEqual(at, [0, 10_000, 20_000, 30_000])
+	assert.deepEqual(ticks, [0, 10_000, 20_000])
+})
+
+test('тайм-аут срабатывает и тогда, когда опрос всё время падает временными сбоями', async (t) => {
+	t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+
+	const { fetcher, at } = scripted([status(503), status(503), status(503)])
+	const waiting = createVeoClient('key', fetcher).wait('op/1', { intervalMs: 1000, timeoutMs: 5000 })
+
+	await assert.rejects(drive(t, waiting), /did not finish in 5s/)
+	assert.deepEqual(at, [0, 2000, 6000])
+})
+
+test('отмена во время паузы обрывает её сразу, без следующего опроса', async (t) => {
+	t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
+
+	const controller = new AbortController()
+	const { fetcher, at } = scripted([pending, pending])
+	const waiting = createVeoClient('key', fetcher).wait('op/1', {
+		intervalMs: 60_000,
+		timeoutMs: 600_000,
+		signal: controller.signal,
+	})
+
+	for (let i = 0; i < 10; i++) await new Promise((resolve) => setImmediate(resolve))
+
+	controller.abort(new Error('cancelled'))
+
+	await assert.rejects(waiting, { message: 'cancelled' })
+	assert.deepEqual(at, [0])
+})
+
+test('отмена посреди запроса не повторяется как сетевой сбой', async () => {
+	const controller = new AbortController()
+	let calls = 0
+	const fetcher = ((_url: string, init?: RequestInit) => {
+		calls++
+
+		// Так ведёт себя fetch при отмене: запрос падает, и это нельзя принять за обрыв сети.
+		return new Promise((_resolve, reject) => {
+			init?.signal?.addEventListener('abort', () => reject(new TypeError('aborted')))
+		})
+	}) as typeof fetch
+	const waiting = createVeoClient('key', fetcher).wait('op/1', {
+		intervalMs: 0,
+		timeoutMs: 600_000,
+		signal: controller.signal,
+	})
+
+	controller.abort()
+
+	await assert.rejects(waiting, { name: 'TypeError', message: 'aborted' })
+	assert.equal(calls, 1)
+})
+
+test('уже отменённый сигнал не даёт сделать ни одного запроса', async () => {
+	const { fetcher, calls } = fakeFetch({})
+
+	await assert.rejects(
+		createVeoClient('key', fetcher).wait('op/1', {
+			intervalMs: 0,
+			timeoutMs: 600_000,
+			signal: AbortSignal.abort(new Error('gone')),
+		}),
+		{ message: 'gone' },
+	)
+
+	assert.equal(calls.length, 0)
+})
+
+test('ошибка скачивания несёт код и тело ответа', async () => {
+	const { fetcher } = fakeFetch({ 'https://files/v': () => new Response('expired', { status: 404 }) })
+
+	await assert.rejects(createVeoClient('key', fetcher).download('https://files/v', join(await tmp(), 'v.mp4')), {
+		message: 'Video download 404: expired',
+	})
+})
+
+test('операция без видео и без причины фильтра отдаёт ответ API как есть', () => {
+	assert.throws(() => videoUriOf({ name: 'op', done: true, response: {} }), {
+		message: 'Veo returned no video: {}',
+	})
+
+	assert.throws(() => videoUriOf({ name: 'op', done: true }), {
+		message: 'Veo returned no video: {"name":"op","done":true}',
+	})
+
+	assert.throws(() => videoUriOf({ name: 'op', error: { code: 13 } }), { message: 'Veo failed: {"code":13}' })
+})
+
+test('запуск рендера шлёт тело predictLongRunning методом POST', async () => {
+	const { fetcher, calls } = fakeFetch({
+		[`${BASE_URL}/models/veo-x:predictLongRunning`]: () => json({ name: 'models/veo-x/operations/1' }),
+	})
+
+	assert.equal(
+		await createVeoClient('key', fetcher).start('veo-x', { prompt: 'p', negativePrompt: 'n', resolution: '1080p' }),
+		'models/veo-x/operations/1',
+	)
+
+	assert.equal(calls[0]?.init?.method, 'POST')
+
+	assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), {
+		instances: [{ prompt: 'p' }],
+		parameters: { resolution: '1080p', negativePrompt: 'n', personGeneration: 'allow_all' },
+	})
+})
+
+test('без имени файла видео называется по времени', async () => {
+	const dir = await tmp()
+
+	assert.match(await outputPath(dir), /\/veo-\d+\.mp4$/)
+	assert.match(await outputPath(dir, ''), /\/veo-\d+\.mp4$/)
+	assert.equal(await outputPath(dir, 'a.MP4'), join(dir, 'a.mp4'))
 })

@@ -16,3 +16,5 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: aimuzov/infra-mcp-kit/check@v2
+        with:
+          coverage-lines: 98

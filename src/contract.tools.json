@@ -1,0 +1,95 @@
+[
+	{
+		"name": "generate_video",
+		"title": "Generate a video with Veo",
+		"description": "Generate a video from a text prompt with Google Veo, optionally starting from an image (image-to-video) and ending on another one. Paid per second of video and takes 1-5 minutes, so ask before generating several variants. Saves an MP4 to disk and returns its path.",
+		"inputSchema": {
+			"type": "object",
+			"properties": {
+				"prompt": {
+					"type": "string",
+					"minLength": 1,
+					"description": "What happens in the video, including camera and sound"
+				},
+				"image": {
+					"description": "Path to the first frame: png, jpg or webp",
+					"type": "string"
+				},
+				"lastFrame": {
+					"description": "Path to the last frame. Requires image",
+					"type": "string"
+				},
+				"negativePrompt": {
+					"description": "What must not appear",
+					"type": "string"
+				},
+				"aspectRatio": {
+					"description": "Default 16:9",
+					"type": "string",
+					"enum": ["16:9", "9:16"]
+				},
+				"durationSeconds": {
+					"description": "Default 8. 1080p and 4k need 8",
+					"type": "number",
+					"enum": [4, 6, 8]
+				},
+				"resolution": {
+					"description": "Default 720p",
+					"type": "string",
+					"enum": ["720p", "1080p", "4k"]
+				},
+				"seed": {
+					"type": "integer",
+					"minimum": -9007199254740991,
+					"maximum": 9007199254740991
+				},
+				"model": {
+					"description": "Veo model id, default veo-3.1-generate-preview. See list_models",
+					"type": "string"
+				},
+				"filename": {
+					"description": "Base filename without extension",
+					"type": "string"
+				},
+				"outputDir": {
+					"description": "Save directory, default ./veo",
+					"type": "string"
+				}
+			},
+			"required": ["prompt"]
+		}
+	},
+	{
+		"name": "fetch_video",
+		"title": "Fetch a Veo video by operation",
+		"description": "Wait for an already started Veo operation and save its video. Use it when generate_video failed after the render had started: its error names the operation. Costs nothing extra.",
+		"inputSchema": {
+			"type": "object",
+			"properties": {
+				"operation": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Operation name from the error, models/.../operations/..."
+				},
+				"filename": {
+					"description": "Base filename without extension",
+					"type": "string"
+				},
+				"outputDir": {
+					"description": "Save directory, default ./veo",
+					"type": "string"
+				}
+			},
+			"required": ["operation"]
+		}
+	},
+	{
+		"name": "list_models",
+		"title": "List Veo models",
+		"description": "List Veo model ids available to this API key.",
+		"inputSchema": {
+			"type": "object",
+			"properties": {}
+		}
+	}
+]
