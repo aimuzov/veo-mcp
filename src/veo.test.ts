@@ -47,7 +47,8 @@ test('первый кадр встраивается base64 и переключ�
 	const body = await buildBody({ prompt: 'p', image, seed: 0 })
 
 	assert.deepEqual(body.instances[0]?.image, {
-		inlineData: { mimeType: 'image/png', data: Buffer.from('png-bytes').toString('base64') },
+		bytesBase64Encoded: Buffer.from('png-bytes').toString('base64'),
+		mimeType: 'image/png',
 	})
 
 	assert.deepEqual(body.parameters, { seed: 0, personGeneration: 'allow_adult' })

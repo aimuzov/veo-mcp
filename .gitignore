@@ -1,4 +1,6 @@
 node_modules
+build
+*.tgz
 
 # Ключ живёт в env, а не в репозитории.
 .env

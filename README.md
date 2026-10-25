@@ -28,22 +28,15 @@ Veo is billed per second of video and a render takes one to five minutes.
 
 ## Setup
 
-Node 26 or newer: the server runs its TypeScript sources directly, there is no build step.
-
-```bash
-git clone https://github.com/aimuzov/veo-mcp.git
-cd veo-mcp
-npm ci --omit=dev
-```
-
-Then add it to your MCP config, see [.mcp.json.example](.mcp.json.example):
+Node 26 or newer. The server is the npm package `@aimuzov/veo-mcp`: add it to your MCP config, see
+[.mcp.json.example](.mcp.json.example):
 
 ```json
 {
 	"mcpServers": {
 		"veo": {
-			"command": "node",
-			"args": ["/path/to/veo-mcp/src/index.ts"],
+			"command": "npx",
+			"args": ["-y", "@aimuzov/veo-mcp"],
 			"env": { "GEMINI_API_KEY": "your-api-key" }
 		}
 	}
@@ -63,12 +56,15 @@ Get a key at [AI Studio](https://aistudio.google.com/apikey). Veo needs a projec
 
 ```bash
 npm install
+npm start          # the TypeScript sources over stdio, no build
 npm test
 npm run lint
 npm run typecheck
+npm run build      # build/ for the npm package
 ```
 
-Formatting and lint rules come from [infra-site-kit](https://github.com/aimuzov/infra-site-kit).
+Shared helpers and the CI steps come from [infra-mcp-kit](https://github.com/aimuzov/infra-mcp-kit), formatting and
+lint rules from [infra-site-kit](https://github.com/aimuzov/infra-site-kit).
 
 ## License
 
