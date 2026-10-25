@@ -1,5 +1,7 @@
-import { failure, int, readVersion, str, tool, type Env } from '@aimuzov/infra-mcp-kit'
+import { failure, int, messageOf, readVersion, str, tool, type Env } from '@aimuzov/infra-mcp-kit'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js'
+import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 
 import {
@@ -40,6 +42,52 @@ const NO_KEY = 'GEMINI_API_KEY is not set. Get one at https://aistudio.google.co
 export function createServer(cfg: Config, client: VeoClient = createVeoClient(cfg.apiKey)): McpServer {
 	const server = new McpServer({ name: 'veo-mcp', version })
 
+	/**
+	 * Дождаться операции и скачать видео. Рендер к этому моменту уже оплачен,
+	 * поэтому в любой ошибке есть имя операции: по нему видео докачает fetch_video.
+	 */
+	async function finish(
+		name: string,
+		{ filename, outputDir = cfg.outputDir }: { filename?: string; outputDir?: string },
+		extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+	): Promise<string> {
+		const progressToken = extra._meta?.progressToken
+
+		try {
+			const op = await client.wait(name, {
+				intervalMs: cfg.pollIntervalMs,
+				timeoutMs: cfg.timeoutMs,
+				signal: extra.signal,
+				// Рендер идёт минутами: прогресс не даёт клиенту оборвать вызов по таймауту.
+				onTick: (elapsed) => {
+					if (progressToken === undefined) return
+
+					void extra.sendNotification({
+						method: 'notifications/progress',
+						params: {
+							progressToken,
+							progress: elapsed,
+							total: cfg.timeoutMs,
+							message: `Veo is rendering, ${Math.round(elapsed / 1000)}s`,
+						},
+					})
+				},
+			})
+			const path = await outputPath(outputDir, filename)
+
+			await client.download(videoUriOf(op), path, extra.signal)
+
+			return path
+		} catch (error) {
+			throw new Error(`${messageOf(error)}. Operation: ${name}`, { cause: error })
+		}
+	}
+
+	const saveArgs = {
+		filename: z.string().optional().describe('Base filename without extension'),
+		outputDir: z.string().optional().describe(`Save directory, default ${cfg.outputDir}`),
+	}
+
 	server.registerTool(
 		'generate_video',
 		{
@@ -58,39 +106,34 @@ export function createServer(cfg: Config, client: VeoClient = createVeoClient(cf
 				resolution: z.enum(RESOLUTIONS).optional().describe('Default 720p'),
 				seed: z.number().int().optional(),
 				model: z.string().optional().describe(`Veo model id, default ${DEFAULT_MODEL}. See list_models`),
-				filename: z.string().optional().describe('Base filename without extension'),
-				outputDir: z.string().optional().describe(`Save directory, default ${cfg.outputDir}`),
+				...saveArgs,
 			},
 		},
 		tool(async (args, extra) => {
 			if (!cfg.apiKey) return failure(NO_KEY)
 
-			const { model = DEFAULT_MODEL, filename, outputDir = cfg.outputDir, ...req } = args
-			const progressToken = extra._meta?.progressToken
-			const name = await client.start(model, req)
-			const op = await client.wait(name, {
-				intervalMs: cfg.pollIntervalMs,
-				timeoutMs: cfg.timeoutMs,
-				// Рендер идёт минутами: прогресс не даёт клиенту оборвать вызов по таймауту.
-				onTick: (elapsed) => {
-					if (progressToken === undefined) return
+			const { model = DEFAULT_MODEL, filename, outputDir, ...req } = args
 
-					void extra.sendNotification({
-						method: 'notifications/progress',
-						params: {
-							progressToken,
-							progress: elapsed,
-							total: cfg.timeoutMs,
-							message: `Veo is rendering, ${Math.round(elapsed / 1000)}s`,
-						},
-					})
-				},
-			})
-			const path = await outputPath(outputDir, filename)
+			return finish(await client.start(model, req), { filename, outputDir }, extra)
+		}),
+	)
 
-			await client.download(videoUriOf(op), path)
+	server.registerTool(
+		'fetch_video',
+		{
+			title: 'Fetch a Veo video by operation',
+			description:
+				'Wait for an already started Veo operation and save its video. Use it when generate_video ' +
+				'failed after the render had started: its error names the operation. Costs nothing extra.',
+			inputSchema: {
+				operation: z.string().min(1).describe('Operation name from the error, models/.../operations/...'),
+				...saveArgs,
+			},
+		},
+		tool(async ({ operation, ...save }, extra) => {
+			if (!cfg.apiKey) return failure(NO_KEY)
 
-			return path
+			return finish(operation, save, extra)
 		}),
 	)
 

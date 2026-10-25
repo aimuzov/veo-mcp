@@ -115,7 +115,44 @@ export type WaitOptions = {
 	intervalMs: number
 	timeoutMs: number
 	onTick?: (elapsedMs: number) => void
+	signal?: AbortSignal
 }
+
+/**
+ * Ответ API не 2xx. Код нужен, чтобы отличить временный сбой
+ * от настоящей ошибки.
+ */
+export class ApiError extends Error {
+	readonly status: number
+
+	constructor(status: number, body: string) {
+		super(`Gemini API ${status}: ${body}`)
+		this.status = status
+	}
+}
+
+// fetch бросает TypeError, когда ответа нет вовсе: DNS, обрыв, сброс соединения.
+export const isTransient = (error: unknown): boolean =>
+	error instanceof ApiError ? error.status === 429 || error.status >= 500 : error instanceof TypeError
+
+const MAX_FAILURES = 5
+const MAX_BACKOFF_MS = 60_000
+
+const sleep = (ms: number, signal?: AbortSignal) =>
+	new Promise<void>((resolve, reject) => {
+		signal?.throwIfAborted()
+
+		const onAbort = () => {
+			clearTimeout(timer)
+			reject(signal?.reason)
+		}
+		const timer = setTimeout(() => {
+			signal?.removeEventListener('abort', onAbort)
+			resolve()
+		}, ms)
+
+		signal?.addEventListener('abort', onAbort, { once: true })
+	})
 
 export type VeoClient = ReturnType<typeof createVeoClient>
 
@@ -126,7 +163,7 @@ export function createVeoClient(apiKey: string, fetcher: typeof fetch = fetch) {
 			headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
 		})
 
-		if (!res.ok) throw new Error(`Gemini API ${res.status}: ${await res.text()}`)
+		if (!res.ok) throw new ApiError(res.status, await res.text())
 
 		return (await res.json()) as T
 	}
@@ -143,31 +180,47 @@ export function createVeoClient(apiKey: string, fetcher: typeof fetch = fetch) {
 			body: JSON.stringify(await buildBody(req)),
 		})
 
+		// Без имени опрос ушёл бы на `/undefined` и упал бы с непонятной 404.
+		if (!op.name) throw new Error(`Veo returned no operation name: ${JSON.stringify(op)}`)
+
 		return op.name
 	}
 
-	async function wait(name: string, { intervalMs, timeoutMs, onTick }: WaitOptions): Promise<Operation> {
+	async function wait(name: string, { intervalMs, timeoutMs, onTick, signal }: WaitOptions): Promise<Operation> {
 		const startedAt = Date.now()
+		let failures = 0
 
 		for (;;) {
-			const op = await call<Operation>(`${BASE_URL}/${name}`)
+			signal?.throwIfAborted()
 
-			if (op.done) return op
+			let delay = intervalMs
+
+			try {
+				const op = await call<Operation>(`${BASE_URL}/${name}`, { signal })
+
+				if (op.done) return op
+
+				failures = 0
+			} catch (error) {
+				if (signal?.aborted || !isTransient(error) || ++failures >= MAX_FAILURES) throw error
+
+				delay = Math.min(intervalMs * 2 ** failures, MAX_BACKOFF_MS)
+			}
 
 			const elapsed = Date.now() - startedAt
 
 			if (elapsed >= timeoutMs) {
-				throw new Error(`Veo did not finish in ${Math.round(timeoutMs / 1000)}s. Operation: ${name}`)
+				throw new Error(`Veo did not finish in ${Math.round(timeoutMs / 1000)}s`)
 			}
 
 			onTick?.(elapsed)
-			await new Promise((r) => setTimeout(r, intervalMs))
+			await sleep(delay, signal)
 		}
 	}
 
 	// URI отвечает редиректом на сам файл и тоже требует ключ.
-	async function download(uri: string, path: string): Promise<void> {
-		const res = await fetcher(uri, { headers: { 'x-goog-api-key': apiKey }, redirect: 'follow' })
+	async function download(uri: string, path: string, signal?: AbortSignal): Promise<void> {
+		const res = await fetcher(uri, { headers: { 'x-goog-api-key': apiKey }, redirect: 'follow', signal })
 
 		if (!res.ok) throw new Error(`Video download ${res.status}: ${await res.text()}`)
 

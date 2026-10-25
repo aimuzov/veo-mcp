@@ -104,13 +104,71 @@ test('клиент запускает рендер, ждёт готовност�
 	assert.ok(calls.every((c) => new Headers(c.init?.headers).get('x-goog-api-key') === 'key'))
 })
 
-test('по таймауту ошибка называет операцию, чтобы её можно было найти', async () => {
+test('по таймауту опрос прекращается', async () => {
 	const { fetcher } = fakeFetch({ [`${BASE_URL}/op/1`]: () => json({ name: 'op/1', done: false }) })
 
 	await assert.rejects(
 		createVeoClient('key', fetcher).wait('op/1', { intervalMs: 0, timeoutMs: 0 }),
-		/did not finish.*op\/1/,
+		/did not finish/,
 	)
+})
+
+test('сетевой сбой, 429 и 5xx при опросе повторяются, а не роняют рендер', async () => {
+	const answers = [
+		() => {
+			throw new TypeError('fetch failed')
+		},
+		() => new Response('busy', { status: 503 }),
+		() => new Response('slow down', { status: 429 }),
+		() => json({ name: 'op/1', done: true }),
+	]
+	const { fetcher, calls } = fakeFetch({ [`${BASE_URL}/op/1`]: () => answers[calls.length - 1]!() })
+	const op = await createVeoClient('key', fetcher).wait('op/1', { intervalMs: 0, timeoutMs: 10_000 })
+
+	assert.equal(op.done, true)
+	assert.equal(calls.length, 4)
+})
+
+test('постоянная ошибка опроса не повторяется', async () => {
+	const { fetcher, calls } = fakeFetch({ [`${BASE_URL}/op/1`]: () => new Response('nope', { status: 404 }) })
+
+	await assert.rejects(createVeoClient('key', fetcher).wait('op/1', { intervalMs: 0, timeoutMs: 10_000 }), {
+		message: 'Gemini API 404: nope',
+	})
+
+	assert.equal(calls.length, 1)
+})
+
+test('временные сбои подряд в конце концов сдаются', async () => {
+	const { fetcher, calls } = fakeFetch({ [`${BASE_URL}/op/1`]: () => new Response('down', { status: 500 }) })
+
+	await assert.rejects(
+		createVeoClient('key', fetcher).wait('op/1', { intervalMs: 0, timeoutMs: 10_000 }),
+		/Gemini API 500/,
+	)
+
+	assert.equal(calls.length, 5)
+})
+
+test('отмена останавливает ожидание между опросами', async () => {
+	const controller = new AbortController()
+	const { fetcher, calls } = fakeFetch({ [`${BASE_URL}/op/1`]: () => json({ name: 'op/1', done: false }) })
+	const waiting = createVeoClient('key', fetcher).wait('op/1', {
+		intervalMs: 60_000,
+		timeoutMs: 600_000,
+		signal: controller.signal,
+		onTick: () => controller.abort(new Error('cancelled')),
+	})
+
+	await assert.rejects(waiting, /cancelled/)
+	assert.equal(calls.length, 1)
+	assert.equal(calls[0]?.init?.signal, controller.signal)
+})
+
+test('ответ без имени операции отклоняется сразу, а не опросом /undefined', async () => {
+	const { fetcher } = fakeFetch({ [`${BASE_URL}/models/veo-x:predictLongRunning`]: () => json({}) })
+
+	await assert.rejects(createVeoClient('key', fetcher).start('veo-x', { prompt: 'p' }), /no operation name/)
 })
 
 test('тело ошибки API передаётся как есть', async () => {
