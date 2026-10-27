@@ -1,6 +1,6 @@
 {
 	"name": "@aimuzov/veo-mcp",
-	"version": "0.3.3",
+	"version": "0.3.4",
 	"description": "MCP server for Google Veo video generation through the Gemini API: text-to-video and image-to-video, saves MP4 files to disk",
 	"keywords": [
 		"mcp",
