@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.4](https://github.com/aimuzov/veo-mcp/compare/v0.3.3...v0.3.4) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** move to infra-mcp-kit 3.2.1 on tmcp 1.20.1 ([a2761bf](https://github.com/aimuzov/veo-mcp/commit/a2761bf7660044916a92340b8d6bd4263031bc94))
+* **deps:** move to infra-mcp-kit 3.2.1 on tmcp 1.20.1 ([525116e](https://github.com/aimuzov/veo-mcp/commit/525116e32429624fb6cef55b174ed5b7f8cd74f6))
+
 ## [0.3.3](https://github.com/aimuzov/veo-mcp/compare/v0.3.2...v0.3.3) (2026-10-25)
 
 
