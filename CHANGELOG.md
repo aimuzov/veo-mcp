@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.5](https://github.com/aimuzov/veo-mcp/compare/v0.3.4...v0.3.5) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** move to infra-mcp-kit 3.4.0 and infra-site-kit 5.8.1 ([8ee49eb](https://github.com/aimuzov/veo-mcp/commit/8ee49eb4d157f4994dc23f6ba7a99b65f51eadfd))
+* **deps:** move to infra-mcp-kit 3.4.0 and infra-site-kit 5.8.1 ([9504889](https://github.com/aimuzov/veo-mcp/commit/9504889d160cadf52eb38c4c78c76a0c5d685584))
+
 ## [0.3.4](https://github.com/aimuzov/veo-mcp/compare/v0.3.3...v0.3.4) (2026-10-27)
 
 
