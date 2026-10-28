@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.6](https://github.com/aimuzov/veo-mcp/compare/v0.3.5...v0.3.6) (2026-10-28)
+
+
+### Bug Fixes
+
+* **deps:** move to infra-mcp-kit 3.4.1 with the strict Sentry events ([74d3334](https://github.com/aimuzov/veo-mcp/commit/74d333491dbd499224fcb04215b693613d261747))
+* **deps:** move to infra-mcp-kit 3.4.1 with the strict Sentry events ([1129978](https://github.com/aimuzov/veo-mcp/commit/11299788bd5c686c1b7a21ee64bfe95a95f576c6))
+
 ## [0.3.5](https://github.com/aimuzov/veo-mcp/compare/v0.3.4...v0.3.5) (2026-10-27)
 
 
