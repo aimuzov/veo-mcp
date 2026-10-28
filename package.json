@@ -50,11 +50,11 @@
 		"prepack": "npm run build"
 	},
 	"dependencies": {
-		"@aimuzov/infra-mcp-kit": "github:aimuzov/infra-mcp-kit#v3.4.0",
+		"@aimuzov/infra-mcp-kit": "github:aimuzov/infra-mcp-kit#v3.4.1",
 		"zod": "4.6.7"
 	},
 	"devDependencies": {
-		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v5.8.1",
+		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v5.9.1",
 		"@modelcontextprotocol/sdk": "1.32.1",
 		"@types/node": "26.6.5",
 		"oxlint": "1.87.0",
