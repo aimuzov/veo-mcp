@@ -32,8 +32,9 @@ jobs:
     if: needs.release.outputs.created == 'true'
     uses: ./.github/workflows/check.yml
 
-  # Пока нет доступа к npm, публикация пропускается. Включается переменной
-  # репозитория `NPM_PUBLISH=true`; без секрета `NPM_TOKEN` нужен trusted publishing.
+  # Публикация идёт при переменной репозитория `NPM_PUBLISH=true`. Токен в секрете
+  # `NPM_TOKEN` должен обходить 2FA, иначе npm попросит одноразовый код;
+  # без секрета нужен trusted publishing.
   publish:
     needs: [release, check]
     # `!cancelled()`, а не `always()`: job идёт и при пропущенных release и check
